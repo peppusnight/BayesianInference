@@ -1,0 +1,9 @@
+/fromGD
+*.pdf
+*.dta
+.ipynb_checkpoints
+*.ini
+__pycache__
+/Assignment_Mattei/trash
+*.R
+*.csv
