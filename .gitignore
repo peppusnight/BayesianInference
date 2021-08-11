@@ -8,3 +8,4 @@ __pycache__
 *.R
 *.csv
 /Assignment_Mattei/testing
+!/Assignment_Mattei/data/JOBSII_HR.csv

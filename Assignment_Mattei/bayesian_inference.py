@@ -93,6 +93,7 @@ for a in ax: a.grid();
 plt.show(block=False)
 f.savefig('{}/{}/point_3_a_i.png'.format(data_path,save_load_folder))
 print('End 3 - a - i!')
+plt.close('all')
 ######################################################################################################
 ######################################################################################################
 
@@ -141,11 +142,12 @@ for a in ax: a.grid();
 plt.show(block=False)
 f.savefig('{}/{}/point_3_a_ii.png'.format(data_path,save_load_folder))
 print('End 3 - a - ii!')
+plt.close('all')
 ######################################################################################################
 ######################################################################################################
 
 ######################################################################################################
-# 3 a ii #
+# 3 b #
 ######################################################################################################
 print('Start 3 - b!')
 data = data_orig.copy(deep=True)
@@ -175,10 +177,14 @@ np.random.seed(2021)
 n_iter = 50000
 ate_fs = []  # ATE of finite sample
 ate_sp = []  # ATE of super population
+theta = {'pi_t':[], 'pi_c':[]}
 for i in range(0,n_iter):
 
-    pi_c_sim = beta(a_c_obs, b_c_obs)  # Sample from psoterioe distribution of the controls
-    pi_t_sim = beta(a_t_obs, b_t_obs)  # Sample from psoterioe distribution of the treated
+    pi_c_sim = beta(a_c_obs, b_c_obs)  # Sample from posterior distribution of the controls
+    pi_t_sim = beta(a_t_obs, b_t_obs)  # Sample from posterioe distribution of the treated
+    # Store probability of the binomial into a dictionary
+    theta['pi_c'].append(pi_c_sim)
+    theta['pi_t'].append(pi_t_sim)
 
     #Imputation of the missing potential outcomes
     y1 , y0 = np.zeros(data.shape[0])*float('nan'), np.zeros(data.shape[0])*float('nan')
@@ -212,3 +218,6 @@ ax[1].set_xlabel('Average Treatment Effect')
 for a in ax: a.grid();
 f.savefig('{}/{}/point_3_b.png'.format(data_path,save_load_folder))
 print('End 3 - b!')
+plt.close('all')
+######################################################################################################
+######################################################################################################
