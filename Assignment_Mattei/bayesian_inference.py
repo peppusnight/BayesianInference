@@ -6,6 +6,7 @@ from utils import *
 import copy
 from numpy.random import beta as beta
 from numpy.random import binomial
+# import pymc3 as pm
 
 def bern(p, size=None):
     return binomial(n=1,p=p,size=size)
@@ -61,7 +62,8 @@ data = data_orig.copy(deep=True)
 print('Start 3 - a - i!')
 treat_var = 'Z'
 causal_var = 'depress6'
-par_prior = dict(nu_c=0, omega2_c=100^2, nu_t=0, omega2_t=100^2, a_c=2, b2_c=0.01, a_t=2, b2_t=0.01)
+par_prior = dict(nu_c=0, omega2_c=100^2, nu_t=0, omega2_t=100^2,
+                 a_c=2, b2_c=0.01, a_t=2, b2_t=0.01)
 if load_saved_model:
     with open('{}/{}/model_3_a_i.json'.format(data_path,save_load_folder),'r') as fid:
         chain_m_3_a_i = js.load(fid)
@@ -69,7 +71,7 @@ if load_saved_model:
     chain_m_3_a_i['Theta'] = pd.DataFrame(chain_m_3_a_i['Theta'])
 else:
     chain_m_3_a_i = model_3_a_i_ii(niter=50000, nburn=5000, thin=1,  par_prior=par_prior, Yobs=data[causal_var],W=data[treat_var],
-                                    seed=2021, theta_start=None, save_results=True)
+                                    seed=2021, theta_start=None)
     with open('{}/{}/model_3_a_i.json'.format(data_path,save_load_folder),'w') as fid:
         out_json = {}
         out_json['Estimands'] = chain_m_3_a_i['Estimands'].to_dict()
@@ -108,7 +110,8 @@ causal_var = 'depress6'
 df['y_log'] = np.log(data[causal_var])
 treat_var = 'Z'
 causal_var = 'y_log'
-par_prior = dict(nu_c=0, omega2_c=100^2, nu_t=0, omega2_t=100^2, a_c=2, b2_c=0.01, a_t=2, b2_t=0.01)
+par_prior = dict(nu_c=0, omega2_c=100^2, nu_t=0, omega2_t=100^2,
+                 a_c=2, b2_c=0.01, a_t=2, b2_t=0.01)
 if load_saved_model:
     with open('{}/{}/model_3_a_ii.json'.format(data_path,save_load_folder),'r') as fid:
         chain_m_3_a_ii = js.load(fid)
@@ -149,6 +152,7 @@ plt.close('all')
 ######################################################################################################
 # 3 b #
 ######################################################################################################
+load_saved_model = True
 print('Start 3 - b!')
 data = data_orig.copy(deep=True)
 treat_var = 'Z'
@@ -172,38 +176,54 @@ b_c_obs = b_c + (1-data.loc[data[treat_var].values==0,causal_var]).sum()
 a_t_obs = a_t + data.loc[data[treat_var].values==1,causal_var].sum()
 b_t_obs = b_t + (1-data.loc[data[treat_var].values==1,causal_var]).sum()
 
-# Simulate
-np.random.seed(2021)
-n_iter = 50000
-ate_fs = []  # ATE of finite sample
-ate_sp = []  # ATE of super population
-theta = {'pi_t':[], 'pi_c':[]}
-for i in range(0,n_iter):
+if load_saved_model==False:
 
-    pi_c_sim = beta(a_c_obs, b_c_obs)  # Sample from posterior distribution of the controls
-    pi_t_sim = beta(a_t_obs, b_t_obs)  # Sample from posterioe distribution of the treated
-    # Store probability of the binomial into a dictionary
-    theta['pi_c'].append(pi_c_sim)
-    theta['pi_t'].append(pi_t_sim)
+    # Simulate
+    np.random.seed(2021)
+    n_iter = 50000
+    ate_fs = []  # ATE of finite sample
+    ate_sp = []  # ATE of super population
+    theta = {'pi_t':[], 'pi_c':[]}
+    for i in range(0,n_iter):
 
-    #Imputation of the missing potential outcomes
-    y1 , y0 = np.zeros(data.shape[0])*float('nan'), np.zeros(data.shape[0])*float('nan')
+        pi_c_sim = beta(a_c_obs, b_c_obs)  # Sample from posterior distribution of the controls
+        pi_t_sim = beta(a_t_obs, b_t_obs)  # Sample from posterior distribution of the treated
+        # Store probability of the binomial into a dictionary
+        theta['pi_c'].append(pi_c_sim)
+        theta['pi_t'].append(pi_t_sim)
 
-    # Imputation of missing data for treated
-    y1[data[treat_var].values == 1] = data.loc[data[treat_var].values==1,causal_var]  # y1 treated are observed
-    y1[data[treat_var].values == 0] = bern(pi_t_sim, size = Nc)  # y1 non-treated are imputed
+        #Imputation of the missing potential outcomes
+        y1 , y0 = np.zeros(data.shape[0])*float('nan'), np.zeros(data.shape[0])*float('nan')
 
-    # Imputation of missing data for nontreated
-    y0[data[treat_var].values == 0] = data.loc[data[treat_var].values==0,causal_var]  # y0 non-treated are observed
-    y0[data[treat_var].values == 1] = bern(pi_c_sim, size = Nt)  # y0 treated are imputed
+        # Imputation of missing data for treated
+        y1[data[treat_var].values == 1] = data.loc[data[treat_var].values==1,causal_var]  # y1 treated are observed
+        y1[data[treat_var].values == 0] = bern(pi_t_sim, size = Nc)  # y1 non-treated are imputed
 
-    # Compute the ATEs
-    ate_fs.append(np.mean(y1)-np.mean(y0))  # average treatment effect of finite sample
-    ate_sp.append(pi_t_sim - pi_c_sim)  # average treatment effect of super population
+        # Imputation of missing data for nontreated
+        y0[data[treat_var].values == 0] = data.loc[data[treat_var].values==0,causal_var]  # y0 non-treated are observed
+        y0[data[treat_var].values == 1] = bern(pi_c_sim, size = Nt)  # y0 treated are imputed
 
-out_ate = pd.DataFrame(data={'ate_fs':ate_fs,'ate_sp':ate_sp})
+        # Compute the ATEs
+        ate_fs.append(np.mean(y1)-np.mean(y0))  # average treatment effect of finite sample
+        ate_sp.append(pi_t_sim - pi_c_sim)  # average treatment effect of super population
+
+    out_ate = pd.DataFrame(data={'ate_fs':ate_fs,'ate_sp':ate_sp})
+
+    # Save model
+    with open('{}/{}/model_3_b.json'.format(data_path, save_load_folder), 'w') as fid:
+        out_json = {}
+        out_json['ate'] = out_ate.to_dict()
+        out_json['theta'] = theta
+        js.dump(out_json, fid, indent=4)
+else:
+    # Load model
+    with open('{}/{}/model_3_b.json'.format(data_path,save_load_folder),'r') as fid:
+        model_b = js.load(fid)
+        out_ate = pd.DataFrame(model_b['ate'])
+        theta = pd.DataFrame(model_b['theta'])
 out_ate.describe([0.025,0.5,0.975]).to_csv('{}/{}/point_3_b.csv'.format(data_path,save_load_folder))
 print(out_ate.describe())
+print(theta.describe())
 
 f, ax = plt.subplots(2,1,sharex=True,figsize=(9,6))
 merged_dist = np.hstack((out_ate['ate_fs'],out_ate['ate_sp'])); merged_dist.sort()
@@ -221,3 +241,64 @@ print('End 3 - b!')
 plt.close('all')
 ######################################################################################################
 ######################################################################################################
+
+######################################################################################################
+# 3 c i #
+######################################################################################################
+load_saved_model = True
+save_load_folder = 'SavedOutput'
+print('Start 3 - c - i!')
+data = data_orig.copy(deep=True)
+causal_var = 'depress6'
+data['y_log'] = np.log(data[causal_var])
+treat_var = 'Z'
+causal_var = 'y_log'
+covariates = ["sex","age","race","nonmarried","educ","EconHard","assertive","motivation"]
+X = data.loc[:,covariates].values
+par_prior = dict(nu_c=np.zeros((len(covariates)+1)),
+                 Omega_c=np.eye((len(covariates)+1))*100**2,
+                 nu_t=np.zeros((len(covariates)+1)),
+                 Omega_t=np.eye((len(covariates)+1))*100**2,
+                 a_c=2, b2_c=0.01, a_t=2, b2_t=0.01)
+if load_saved_model:
+    with open('{}/{}/model_3_c_i.json'.format(data_path,save_load_folder),'r') as fid:
+        chain_m_3_c_i = js.load(fid)
+    chain_m_3_c_i['Estimands'] = pd.DataFrame(chain_m_3_c_i['Estimands'])
+    chain_m_3_c_i['Theta'] = pd.DataFrame(chain_m_3_c_i['Theta'])
+else:
+    chain_m_3_c_i = model_3_c_i(niter=25000, nburn=5000, thin=1, par_prior=par_prior, Yobs=data[causal_var].values,
+                            W=data[treat_var].values,
+                            y_log=True,
+                            X=X, seed=2021, theta_start=None)
+    with open('{}/{}/model_3_c_i.json'.format(data_path,save_load_folder),'w') as fid:
+        out_json = {}
+        out_json['Estimands'] = chain_m_3_c_i['Estimands'].to_dict()
+        out_json['Theta'] = chain_m_3_c_i['Theta'].to_dict()
+        js.dump(out_json, fid, indent=4)
+
+print(chain_m_3_c_i['Estimands'].describe())
+print(chain_m_3_c_i['Theta'].describe())
+beta_c_df = pd.DataFrame([i for i in chain_m_3_c_i['Theta']['beta_c'].apply(lambda x: js.loads(x))], columns=['beta_c_{}'.format(i) for i in range(0,len(covariates)+1)])
+print(beta_c_df.describe())
+beta_t_df = pd.DataFrame([i for i in chain_m_3_c_i['Theta']['beta_t'].apply(lambda x: js.loads(x))], columns=['beta_t_{}'.format(i) for i in range(0,len(covariates)+1)])
+print(beta_t_df.describe())
+chain_m_3_c_i['Estimands'].describe([0.025,0.5,0.975]).to_csv('{}/{}/point_3_c_i.csv'.format(data_path,save_load_folder))
+beta_t_df.describe([0.025,0.5,0.975]).to_csv('{}/{}/point_3_c_i_beta_t.csv'.format(data_path,save_load_folder))
+beta_c_df.describe([0.025,0.5,0.975]).to_csv('{}/{}/point_3_c_i_beta_c.csv'.format(data_path,save_load_folder))
+
+
+f, ax = plt.subplots(2,1,sharex=True,figsize=(9,6))
+merged_dist = np.hstack((chain_m_3_c_i['Estimands']['ate_fs'],chain_m_3_c_i['Estimands']['ate_sp'])); merged_dist.sort()
+bin_count,bins = np.histogram(merged_dist,40)
+ax[0].hist(chain_m_3_c_i['Estimands']['ate_fs'], bins=bins)
+ax[0].axvline(x=chain_m_3_c_i['Estimands']['ate_fs'].mean(), ymax=bin_count.max(), ymin=0, color='r')
+ax[0].set_ylabel('Bin count ATE_FS')
+ax[1].hist(chain_m_3_c_i['Estimands']['ate_sp'], bins=bins)
+ax[1].axvline(x=chain_m_3_c_i['Estimands']['ate_fs'].mean(), ymax=bin_count.max(), ymin=0, color='r')
+ax[1].set_ylabel('Bin count ATE_SP')
+ax[1].set_xlabel('Average Treatment Effect')
+for a in ax: a.grid();
+plt.show(block=False)
+f.savefig('{}/{}/point_3_c_i.png'.format(data_path,save_load_folder))
+print('End 3 - c - i!')
+plt.close('all')
