@@ -5,7 +5,9 @@
 *.ini
 __pycache__
 /Assignment_Mattei/trash
+/Assignment_Mealli/trash
 *.R
 *.csv
+*.png
 /Assignment_Mattei/testing
 !/Assignment_Mattei/data/JOBSII_HR.csv
